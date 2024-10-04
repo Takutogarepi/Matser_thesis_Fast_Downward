@@ -1,0 +1,6 @@
+/home/taku/Documents/Unibas 2024/Master Thesis/Code/Matser_thesis_Fast_Downward/build/CMakeFiles/translate.dir
+/home/taku/Documents/Unibas 2024/Master Thesis/Code/Matser_thesis_Fast_Downward/build/CMakeFiles/edit_cache.dir
+/home/taku/Documents/Unibas 2024/Master Thesis/Code/Matser_thesis_Fast_Downward/build/CMakeFiles/rebuild_cache.dir
+/home/taku/Documents/Unibas 2024/Master Thesis/Code/Matser_thesis_Fast_Downward/build/search/CMakeFiles/downward.dir
+/home/taku/Documents/Unibas 2024/Master Thesis/Code/Matser_thesis_Fast_Downward/build/search/CMakeFiles/edit_cache.dir
+/home/taku/Documents/Unibas 2024/Master Thesis/Code/Matser_thesis_Fast_Downward/build/search/CMakeFiles/rebuild_cache.dir
