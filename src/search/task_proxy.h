@@ -723,6 +723,9 @@ public:
             state_values, ancestor_task_proxy.task);
         return create_state(std::move(state_values));
     }
+    std::map<FactPair, std::vector<FactPair>> get_mutex_facts() const{
+        return task->get_mutex_facts();
+    }
 
     const causal_graph::CausalGraph &get_causal_graph() const;
 };

@@ -10,6 +10,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <map>
 
 struct FactPair {
     int var;
@@ -59,6 +60,12 @@ public:
     virtual int get_variable_default_axiom_value(int var) const = 0;
     virtual std::string get_fact_name(const FactPair &fact) const = 0;
     virtual bool are_facts_mutex(const FactPair &fact1, const FactPair &fact2) const = 0;
+
+    //get_mutex_facts implement it here directly.
+    virtual std::map<FactPair, std::vector<FactPair>> get_mutex_facts() const = 0;
+ 
+
+
 
     virtual int get_operator_cost(int index, bool is_axiom) const = 0;
     virtual std::string get_operator_name(int index, bool is_axiom) const = 0;

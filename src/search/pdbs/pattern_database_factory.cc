@@ -304,7 +304,7 @@ void PatternDatabaseFactory::compute_distances(
             pq.push(0, state_index);
             distances.push_back(0);
         } else {
-            distances.push_back(numeric_limits<int>::max());
+            distances.push_back(numeric_limits<int>::max());//infinity
         }
     }
 
@@ -435,6 +435,7 @@ shared_ptr<PatternDatabase> compute_pdb(
     const Pattern &pattern,
     const vector<int> &operator_costs,
     const shared_ptr<utils::RandomNumberGenerator> &rng) {
+        task_proxy.get_mutex_facts();
     PatternDatabaseFactory pdb_factory(task_proxy, pattern, operator_costs, false, rng);
     return pdb_factory.extract_pdb();
 }
