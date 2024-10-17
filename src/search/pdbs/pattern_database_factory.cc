@@ -119,7 +119,7 @@ public:
 };
 
 void PatternDatabaseFactory::compute_variable_to_index(const Pattern &pattern) {
-    variable_to_index.resize(variables.size(), -1);
+    variable_to_index.resize(variables.size(), -1); //-1 means variables are not included in the pattern
     for (size_t i = 0; i < pattern.size(); ++i) {
         variable_to_index[pattern[i]] = i;
     }
@@ -304,7 +304,7 @@ void PatternDatabaseFactory::compute_distances(
             pq.push(0, state_index);
             distances.push_back(0);
         } else {
-            distances.push_back(numeric_limits<int>::max());//infinity
+            distances.push_back(numeric_limits<int>::max());//this is how we represent infinity
         }
     }
 
@@ -336,15 +336,49 @@ void PatternDatabaseFactory::compute_distances(
         match_tree.get_applicable_operator_ids(state_index, applicable_operator_ids);
         for (int op_id : applicable_operator_ids) {
             const AbstractOperator &op = abstract_ops[op_id];
-            int predecessor = state_index + op.get_hash_effect();
-            int alternative_cost = distances[state_index] + op.get_cost();
-            if (alternative_cost < distances[predecessor]) {
-                distances[predecessor] = alternative_cost;
-                pq.push(alternative_cost, predecessor);
-                if (compute_plan) {
-                    generating_op_ids[predecessor] = op_id;
+            int predecessor = state_index + op.get_hash_effect();// if there are mutex violations the next lines don't run.
+
+
+            bool mutex_violation_status = false; 
+            int mutex_facts_count = 0; // counter to make sure we have at most one fact from mutex_map.
+            const auto &mutex_map = task_proxy.get_mutex_facts();
+
+            for (const auto &pair_of_mutex_facts: mutex_map){
+                const FactPair &fact = pair_of_mutex_facts.first;
+                const std::vector<FactPair> &mutex_facts = pair_of_mutex_facts.second;
+
+                for (const FactPair &mutex_fact : mutex_facts){
+
+                    if (std::find_if(projection.get_pattern().begin(), projection.get_pattern().end(),[&](int var){
+
+                        return mutex_fact.var == var && projection.unrank(state_index, var) == mutex_fact.value;
+
+                    }) != projection.get_pattern().end()){
+                        mutex_facts_count++;
+                    }
+
+                    if(mutex_facts_count > 1){
+                        mutex_violation_status = true;
+                        break;
+                    }
+                    mutex_facts_count = 0;
+
+                }
+                if(!mutex_violation_status){
+                    int alternative_cost = distances[state_index] + op.get_cost();
+                    if (alternative_cost < distances[predecessor]) {
+                        distances[predecessor] = alternative_cost;
+                        pq.push(alternative_cost, predecessor);
+                        if (compute_plan) {
+                            generating_op_ids[predecessor] = op_id;
+                        }
+                    }
                 }
             }
+
+
+
+            
         }
     }
 }
@@ -435,7 +469,7 @@ shared_ptr<PatternDatabase> compute_pdb(
     const Pattern &pattern,
     const vector<int> &operator_costs,
     const shared_ptr<utils::RandomNumberGenerator> &rng) {
-        task_proxy.get_mutex_facts();
+    task_proxy.get_mutex_facts();
     PatternDatabaseFactory pdb_factory(task_proxy, pattern, operator_costs, false, rng);
     return pdb_factory.extract_pdb();
 }
