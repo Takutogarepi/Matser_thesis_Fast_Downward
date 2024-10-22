@@ -339,9 +339,18 @@ void PatternDatabaseFactory::compute_distances(
             int predecessor = state_index + op.get_hash_effect();// if there are mutex violations the next lines don't run.
 
 
-            bool mutex_violation_status = false; 
+            bool mutex_violation_status = false;
+            bool valid_operator_and_valid_pred_state = true; 
             int mutex_facts_count = 0; // counter to make sure we have at most one fact from mutex_map.
             const auto &mutex_map = task_proxy.get_mutex_facts();
+
+            
+            vector<int> predecessor_values;
+            for (int predecessor_var : projection.get_pattern()){
+                int predecessor_val = projection.unrank(predecessor,predecessor_var);
+                predecessor_values.push_back(predecessor_val);
+            }
+            
 
             for (const auto &pair_of_mutex_facts: mutex_map){
                 const FactPair &fact = pair_of_mutex_facts.first;
@@ -359,12 +368,48 @@ void PatternDatabaseFactory::compute_distances(
 
                     if(mutex_facts_count > 1){
                         mutex_violation_status = true;
-                        break;
+                        break; 
                     }
                     mutex_facts_count = 0;
 
                 }
+                if(mutex_violation_status){
+                    break;
+                }
+
                 if(!mutex_violation_status){
+                    int concrete_op_id = op.get_concrete_op_id();
+                    const OperatorProxy &concrete_op = task_proxy.get_operators()[concrete_op_id];
+
+                    for(FactProxy precond : concrete_op.get_preconditions()){
+                       int variable_id = precond.get_variable().get_id();
+                       int value = precond.get_value();
+
+                       for(const auto &pair_of_mutex_facts: mutex_map){
+                        const FactPair &mutex_fact = pair_of_mutex_facts.first;
+                        const vector<FactPair> &mutex_facts = pair_of_mutex_facts.second;
+
+                        if(mutex_fact.var == variable_id && mutex_fact.value == value){
+                            for(const FactPair &mutex_fact_precond : mutex_facts){
+                                if(std::find_if(predecessor_values.begin(), predecessor_values.end(), [&](int predecessor_val){
+                                    return mutex_fact_precond.var == variable_id && predecessor_val == mutex_fact_precond.value;
+                                })!=predecessor_values.end()){
+                                    valid_operator_and_valid_pred_state = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if(!valid_operator_and_valid_pred_state){
+                            break;
+                        }
+                       }
+                       if(!valid_operator_and_valid_pred_state){
+                        break;
+                       }
+                    }
+                }
+
+                if(!mutex_violation_status && valid_operator_and_valid_pred_state){
                     int alternative_cost = distances[state_index] + op.get_cost();
                     if (alternative_cost < distances[predecessor]) {
                         distances[predecessor] = alternative_cost;
