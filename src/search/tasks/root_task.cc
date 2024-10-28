@@ -426,7 +426,7 @@ bool RootTask::are_facts_mutex(const FactPair &fact1, const FactPair &fact2) con
 std::map<FactPair, std::vector<FactPair>> RootTask::get_mutex_facts() const {
     std::map<FactPair, std::vector<FactPair>> map_of_mutex_facts;
 
-    for (size_t var = 0 ; mutexes.size(); var++){
+    for (size_t var = 0 ; var < mutexes.size(); var++){
         for (size_t value = 0; value < mutexes[var].size(); value++){
 
             FactPair fact(var,value); // we create a FactPair object with the corresponding var,value.
@@ -436,6 +436,8 @@ std::map<FactPair, std::vector<FactPair>> RootTask::get_mutex_facts() const {
             std::vector<FactPair> mutex_facts(mutex_set.begin(), mutex_set.end());
 
             map_of_mutex_facts[fact] = mutex_facts;
+            
+            
         }
     }
     return map_of_mutex_facts;

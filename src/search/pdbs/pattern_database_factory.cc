@@ -13,6 +13,7 @@
 #include <cassert>
 #include <limits>
 #include <vector>
+#include <unordered_map>
 
 using namespace std;
 
@@ -119,7 +120,7 @@ public:
 };
 
 void PatternDatabaseFactory::compute_variable_to_index(const Pattern &pattern) {
-    variable_to_index.resize(variables.size(), -1); //-1 means variables are not included in the pattern
+    variable_to_index.resize(variables.size(), -1);
     for (size_t i = 0; i < pattern.size(); ++i) {
         variable_to_index[pattern[i]] = i;
     }
@@ -304,7 +305,7 @@ void PatternDatabaseFactory::compute_distances(
             pq.push(0, state_index);
             distances.push_back(0);
         } else {
-            distances.push_back(numeric_limits<int>::max());//this is how we represent infinity
+            distances.push_back(numeric_limits<int>::max());
         }
     }
 
@@ -323,6 +324,8 @@ void PatternDatabaseFactory::compute_distances(
     }
 
     // Dijkstra loop
+    const auto &mutex_map = task_proxy.get_mutex_facts();
+
     while (!pq.empty()) {
         pair<int, int> node = pq.pop();
         int distance = node.first;
@@ -336,93 +339,72 @@ void PatternDatabaseFactory::compute_distances(
         match_tree.get_applicable_operator_ids(state_index, applicable_operator_ids);
         for (int op_id : applicable_operator_ids) {
             const AbstractOperator &op = abstract_ops[op_id];
-            int predecessor = state_index + op.get_hash_effect();// if there are mutex violations the next lines don't run.
+            int predecessor = state_index + op.get_hash_effect();
+    
 
+            vector<int> global_variable_to_pattern_id(task_proxy.get_variables().size(),-1);
+            for(size_t i = 0; i < projection.get_pattern().size(); i++){
+                global_variable_to_pattern_id[projection.get_pattern()[i]]=i;
+            }
 
             bool mutex_violation_status = false;
-            bool valid_operator_and_valid_pred_state = true; 
-            int mutex_facts_count = 0; // counter to make sure we have at most one fact from mutex_map.
-            const auto &mutex_map = task_proxy.get_mutex_facts();
+            for(const auto &pair_of_mutex_facts: mutex_map){
 
-            
-            vector<int> predecessor_values;
-            for (int predecessor_var : projection.get_pattern()){
-                int predecessor_val = projection.unrank(predecessor,predecessor_var);
-                predecessor_values.push_back(predecessor_val);
-            }
-            
-
-            for (const auto &pair_of_mutex_facts: mutex_map){
-                const FactPair &fact = pair_of_mutex_facts.first;
+                const FactPair &fact = pair_of_mutex_facts.first;//check if in precond
                 const std::vector<FactPair> &mutex_facts = pair_of_mutex_facts.second;
 
-                for (const FactPair &mutex_fact : mutex_facts){
+                
+                int fact_pattern_id = global_variable_to_pattern_id[fact.var];
+                if(fact_pattern_id == -1){
+                    continue;
+                }
 
-                    if (std::find_if(projection.get_pattern().begin(), projection.get_pattern().end(),[&](int var){
+                if(projection.unrank(predecessor, fact_pattern_id)!= fact.value){
+                    continue;
+                }
+                        
 
-                        return mutex_fact.var == var && projection.unrank(state_index, var) == mutex_fact.value;
-
-                    }) != projection.get_pattern().end()){
-                        mutex_facts_count++;
+                for(const FactPair &mutex_fact : mutex_facts){
+                    //check if it's in the precond
+                    int pattern_id = global_variable_to_pattern_id[mutex_fact.var];
+                    if(pattern_id == -1){
+                        continue;
                     }
-
-                    if(mutex_facts_count > 1){
+                    if(projection.unrank(predecessor, pattern_id)== mutex_fact.value){
                         mutex_violation_status = true;
-                        break; 
+                        std::cout << task_proxy.get_variables()[mutex_fact.var].get_fact(mutex_fact.value).get_name() <<" ";
+                        
                     }
-                    mutex_facts_count = 0;
+
+    
+
+                    if(mutex_violation_status){
+                        
+                        continue;
+
+                    }
+
+                    
 
                 }
-                if(mutex_violation_status){
-                    break;
-                }
+                std::cout << endl;
 
-                if(!mutex_violation_status){
-                    int concrete_op_id = op.get_concrete_op_id();
-                    const OperatorProxy &concrete_op = task_proxy.get_operators()[concrete_op_id];
-
-                    for(FactProxy precond : concrete_op.get_preconditions()){
-                       int variable_id = precond.get_variable().get_id();
-                       int value = precond.get_value();
-
-                       for(const auto &pair_of_mutex_facts: mutex_map){
-                        const FactPair &mutex_fact = pair_of_mutex_facts.first;
-                        const vector<FactPair> &mutex_facts = pair_of_mutex_facts.second;
-
-                        if(mutex_fact.var == variable_id && mutex_fact.value == value){
-                            for(const FactPair &mutex_fact_precond : mutex_facts){
-                                if(std::find_if(predecessor_values.begin(), predecessor_values.end(), [&](int predecessor_val){
-                                    return mutex_fact_precond.var == variable_id && predecessor_val == mutex_fact_precond.value;
-                                })!=predecessor_values.end()){
-                                    valid_operator_and_valid_pred_state = false;
-                                    break;
-                                }
+            }
+            if(!mutex_violation_status){
+                        int alternative_cost = distances[state_index] + op.get_cost();
+                        if (alternative_cost < distances[predecessor]) {
+                            distances[predecessor] = alternative_cost;
+                            pq.push(alternative_cost, predecessor);
+                            if (compute_plan) {
+                                generating_op_ids[predecessor] = op_id;
                             }
                         }
-                        if(!valid_operator_and_valid_pred_state){
-                            break;
-                        }
-                       }
-                       if(!valid_operator_and_valid_pred_state){
-                        break;
-                       }
                     }
-                }
-
-                if(!mutex_violation_status && valid_operator_and_valid_pred_state){
-                    int alternative_cost = distances[state_index] + op.get_cost();
-                    if (alternative_cost < distances[predecessor]) {
-                        distances[predecessor] = alternative_cost;
-                        pq.push(alternative_cost, predecessor);
-                        if (compute_plan) {
-                            generating_op_ids[predecessor] = op_id;
-                        }
-                    }
-                }
-            }
 
 
 
+
+            
             
         }
     }

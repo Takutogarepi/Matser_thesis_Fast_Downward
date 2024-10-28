@@ -61,8 +61,10 @@ public:
     virtual std::string get_fact_name(const FactPair &fact) const = 0;
     virtual bool are_facts_mutex(const FactPair &fact1, const FactPair &fact2) const = 0;
 
-    //get_mutex_facts implement it here directly.
-    virtual std::map<FactPair, std::vector<FactPair>> get_mutex_facts() const = 0;
+    
+    virtual std::map<FactPair, std::vector<FactPair>> get_mutex_facts() const{
+        return std::map<FactPair, std::vector<FactPair>>();
+    };
  
 
 
