@@ -13,7 +13,7 @@
 #include <cassert>
 #include <limits>
 #include <vector>
-#include <unordered_map>
+
 
 using namespace std;
 
@@ -340,21 +340,39 @@ void PatternDatabaseFactory::compute_distances(
         for (int op_id : applicable_operator_ids) {
             const AbstractOperator &op = abstract_ops[op_id];
             int predecessor = state_index + op.get_hash_effect();
-    
 
+            int concrete_operator_id = op.get_concrete_op_id();
+            const OperatorProxy &concrete_operator = task_proxy.get_operators()[concrete_operator_id];
+
+            vector<FactPair> preconditions; 
+            for (FactProxy precond : concrete_operator.get_preconditions()) {
+                preconditions.push_back(precond.get_pair());
+            }
+    
             vector<int> global_variable_to_pattern_id(task_proxy.get_variables().size(),-1);
             for(size_t i = 0; i < projection.get_pattern().size(); i++){
                 global_variable_to_pattern_id[projection.get_pattern()[i]]=i;
             }
 
             bool mutex_violation_status = false;
+            bool mutex_violation_status_2 = false;
             for(const auto &pair_of_mutex_facts: mutex_map){
 
                 const FactPair &fact = pair_of_mutex_facts.first;//check if in precond
                 const std::vector<FactPair> &mutex_facts = pair_of_mutex_facts.second;
-
-                
+ 
                 int fact_pattern_id = global_variable_to_pattern_id[fact.var];
+
+                for(const FactPair precondition: preconditions){
+                    if(precondition.var != fact.var){
+                        continue;
+                    }
+                    if(precondition.value != fact.value){
+                        continue;
+                    }
+                    
+                }
+
                 if(fact_pattern_id == -1){
                     continue;
                 }
@@ -362,35 +380,44 @@ void PatternDatabaseFactory::compute_distances(
                 if(projection.unrank(predecessor, fact_pattern_id)!= fact.value){
                     continue;
                 }
-                        
-
+                     
                 for(const FactPair &mutex_fact : mutex_facts){
                     //check if it's in the precond
                     int pattern_id = global_variable_to_pattern_id[mutex_fact.var];
-                    if(pattern_id == -1){
+                    
+                    for(const FactPair precond: preconditions){
+
+                        if(precond.var != mutex_fact.var){
+                            continue;
+                        }
+
+                        if(precond.value == mutex_fact.value){
+                            mutex_violation_status_2 = true;
+                        }
+
+                    }
+                    if(mutex_violation_status_2){
                         continue;
                     }
+
+                   if(pattern_id == -1){
+                        continue;
+                    }
+                    
                     if(projection.unrank(predecessor, pattern_id)== mutex_fact.value){
                         mutex_violation_status = true;
-                        std::cout << task_proxy.get_variables()[mutex_fact.var].get_fact(mutex_fact.value).get_name() <<" ";
-                        
+                        //std::cout << task_proxy.get_variables()[mutex_fact.var].get_fact(mutex_fact.value).get_name() <<" ";
                     }
-
-    
-
+                    
                     if(mutex_violation_status){
                         
                         continue;
-
-                    }
-
-                    
-
+                   } 
                 }
-                std::cout << endl;
+                //std::cout << endl;
 
             }
-            if(!mutex_violation_status){
+            if(!mutex_violation_status && !mutex_violation_status_2){
                         int alternative_cost = distances[state_index] + op.get_cost();
                         if (alternative_cost < distances[predecessor]) {
                             distances[predecessor] = alternative_cost;
@@ -400,11 +427,6 @@ void PatternDatabaseFactory::compute_distances(
                             }
                         }
                     }
-
-
-
-
-            
             
         }
     }
