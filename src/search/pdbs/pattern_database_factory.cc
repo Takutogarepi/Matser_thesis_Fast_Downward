@@ -355,7 +355,6 @@ void PatternDatabaseFactory::compute_distances(
             }
 
             bool mutex_violation_status = false;
-            bool mutex_violation_status_2 = false;
             for(const auto &pair_of_mutex_facts: mutex_map){
 
                 const FactPair &fact = pair_of_mutex_facts.first;//check if in precond
@@ -363,61 +362,56 @@ void PatternDatabaseFactory::compute_distances(
  
                 int fact_pattern_id = global_variable_to_pattern_id[fact.var];
 
+                bool is_fact_in_precondition = false;
                 for(const FactPair precondition: preconditions){
                     if(precondition.var != fact.var){
-                        continue;
+                        break;
                     }
                     if(precondition.value != fact.value){
-                        continue;
+                        break;
                     }
+                    is_fact_in_precondition = true;
+                    break;
                     
                 }
+               
+                bool is_fact_in_pattern = (fact_pattern_id != -1 && projection.unrank(predecessor, fact_pattern_id)== fact.value);
 
-                if(fact_pattern_id == -1){
-                    continue;
-                }
-
-                if(projection.unrank(predecessor, fact_pattern_id)!= fact.value){
+                if(!is_fact_in_pattern && !is_fact_in_precondition){
                     continue;
                 }
                      
                 for(const FactPair &mutex_fact : mutex_facts){
-                    //check if it's in the precond
+                    
                     int pattern_id = global_variable_to_pattern_id[mutex_fact.var];
                     
+                    bool is_mutex_fact_in_precondition = false;
+
                     for(const FactPair precond: preconditions){
 
-                        if(precond.var != mutex_fact.var){
-                            continue;
+                        if(precond.var == mutex_fact.var && precond.value == mutex_fact.value){
+                            is_mutex_fact_in_precondition = true;
+                            break;
                         }
 
-                        if(precond.value == mutex_fact.value){
-                            mutex_violation_status_2 = true;
-                        }
-
-                    }
-                    if(mutex_violation_status_2){
-                        continue;
-                    }
-
-                   if(pattern_id == -1){
-                        continue;
                     }
                     
-                    if(projection.unrank(predecessor, pattern_id)== mutex_fact.value){
+                    bool is_mutex_fact_in_state = (pattern_id != -1 && projection.unrank(predecessor, pattern_id)== mutex_fact.value);
+
+                    if(is_mutex_fact_in_state || is_mutex_fact_in_precondition ){
                         mutex_violation_status = true;
-                        //std::cout << task_proxy.get_variables()[mutex_fact.var].get_fact(mutex_fact.value).get_name() <<" ";
+                        
                     }
                     
-                    if(mutex_violation_status){
-                        
+                    if(mutex_violation_status){  
                         continue;
                    } 
+
                 }
-                //std::cout << endl;
+                
 
             }
-            if(!mutex_violation_status && !mutex_violation_status_2){
+            if(!mutex_violation_status){
                         int alternative_cost = distances[state_index] + op.get_cost();
                         if (alternative_cost < distances[predecessor]) {
                             distances[predecessor] = alternative_cost;
