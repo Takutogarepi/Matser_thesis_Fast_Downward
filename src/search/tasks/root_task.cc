@@ -432,6 +432,9 @@ std::map<FactPair, std::vector<FactPair>> RootTask::get_mutex_facts() const {
             FactPair fact(var,value); // we create a FactPair object with the corresponding var,value.
 
             const auto &mutex_set = mutexes[var][value];
+            if(mutex_set.empty()){
+                continue;
+            }
 
             std::vector<FactPair> mutex_facts(mutex_set.begin(), mutex_set.end());
 

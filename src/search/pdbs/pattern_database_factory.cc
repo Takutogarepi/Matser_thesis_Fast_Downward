@@ -323,9 +323,15 @@ void PatternDatabaseFactory::compute_distances(
         generating_op_ids.resize(projection.get_num_abstract_states());
     }
 
-    // Dijkstra loop
+    
     const auto &mutex_map = task_proxy.get_mutex_facts();
 
+    vector<int> global_variable_to_pattern_id(task_proxy.get_variables().size(),-1);
+            for(size_t i = 0; i < projection.get_pattern().size(); i++){
+                global_variable_to_pattern_id[projection.get_pattern()[i]]=i;
+            }
+            
+    // Dijkstra loop
     while (!pq.empty()) {
         pair<int, int> node = pq.pop();
         int distance = node.first;
@@ -349,33 +355,23 @@ void PatternDatabaseFactory::compute_distances(
                 preconditions.push_back(precond.get_pair());
             }
     
-            vector<int> global_variable_to_pattern_id(task_proxy.get_variables().size(),-1);
-            for(size_t i = 0; i < projection.get_pattern().size(); i++){
-                global_variable_to_pattern_id[projection.get_pattern()[i]]=i;
-            }
-
-            bool mutex_violation_status = false;
+            bool mutex_violation_found = false;
             for(const auto &pair_of_mutex_facts: mutex_map){
 
                 const FactPair &fact = pair_of_mutex_facts.first;//check if in precond
-                const std::vector<FactPair> &mutex_facts = pair_of_mutex_facts.second;
+                const vector<FactPair> &mutex_facts = pair_of_mutex_facts.second;
  
                 int fact_pattern_id = global_variable_to_pattern_id[fact.var];
 
                 bool is_fact_in_precondition = false;
-                for(const FactPair precondition: preconditions){
-                    if(precondition.var != fact.var){
+                for(const FactPair precondition : preconditions){
+                    if(precondition.var == fact.var && precondition.value == fact.value){
+                        is_fact_in_precondition = true;
                         break;
-                    }
-                    if(precondition.value != fact.value){
-                        break;
-                    }
-                    is_fact_in_precondition = true;
-                    break;
-                    
+                    }  
                 }
                
-                bool is_fact_in_pattern = (fact_pattern_id != -1 && projection.unrank(predecessor, fact_pattern_id)== fact.value);
+                bool is_fact_in_pattern = (fact_pattern_id != -1 && projection.unrank(predecessor, fact_pattern_id) == fact.value);
 
                 if(!is_fact_in_pattern && !is_fact_in_precondition){
                     continue;
@@ -392,26 +388,28 @@ void PatternDatabaseFactory::compute_distances(
                         if(precond.var == mutex_fact.var && precond.value == mutex_fact.value){
                             is_mutex_fact_in_precondition = true;
                             break;
+
                         }
 
                     }
                     
-                    bool is_mutex_fact_in_state = (pattern_id != -1 && projection.unrank(predecessor, pattern_id)== mutex_fact.value);
+                    bool is_mutex_fact_in_state = (pattern_id != -1 && projection.unrank(predecessor, pattern_id) == mutex_fact.value);
 
                     if(is_mutex_fact_in_state || is_mutex_fact_in_precondition ){
-                        mutex_violation_status = true;
+                        mutex_violation_found = true;
+                        break;
                         
                     }
                     
-                    if(mutex_violation_status){  
-                        continue;
+                    if(mutex_violation_found){  
+                        break;
                    } 
 
                 }
                 
 
             }
-            if(!mutex_violation_status){
+            if(!mutex_violation_found){
                         int alternative_cost = distances[state_index] + op.get_cost();
                         if (alternative_cost < distances[predecessor]) {
                             distances[predecessor] = alternative_cost;
