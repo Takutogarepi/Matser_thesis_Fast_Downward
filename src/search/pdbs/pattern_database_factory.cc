@@ -330,6 +330,10 @@ void PatternDatabaseFactory::compute_distances(
             for(size_t i = 0; i < projection.get_pattern().size(); i++){
                 global_variable_to_pattern_id[projection.get_pattern()[i]]=i;
             }
+
+    
+    vector<FactPair> preconditions; 
+    preconditions.reserve(task_proxy.get_variables().size());
             
     // Dijkstra loop
     while (!pq.empty()) {
@@ -350,7 +354,7 @@ void PatternDatabaseFactory::compute_distances(
             int concrete_operator_id = op.get_concrete_op_id();
             const OperatorProxy &concrete_operator = task_proxy.get_operators()[concrete_operator_id];
 
-            vector<FactPair> preconditions; 
+            preconditions.clear(); 
             for (FactProxy precond : concrete_operator.get_preconditions()) {
                 preconditions.push_back(precond.get_pair());
             }
