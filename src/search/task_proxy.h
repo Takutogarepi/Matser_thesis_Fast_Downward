@@ -723,7 +723,11 @@ public:
             state_values, ancestor_task_proxy.task);
         return create_state(std::move(state_values));
     }
+    /*
     std::map<FactPair, std::vector<FactPair>> get_mutex_facts() const{
+        return task->get_mutex_facts();
+    }*/
+   std::unordered_map<FactPair, std::vector<FactPair>, FactPairHash> get_mutex_facts() const{
         return task->get_mutex_facts();
     }
 
