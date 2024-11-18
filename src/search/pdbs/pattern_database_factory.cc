@@ -8,11 +8,13 @@
 #include "../task_utils/task_properties.h"
 #include "../utils/math.h"
 #include "../utils/rng.h"
+#include "../utils/hash.h"
 
 #include <algorithm>
 #include <cassert>
 #include <limits>
 #include <vector>
+#include <unordered_map>
 
 
 using namespace std;
@@ -334,7 +336,9 @@ void PatternDatabaseFactory::compute_distances(
     
     vector<FactPair> preconditions; 
     preconditions.reserve(task_proxy.get_variables().size());
-            
+
+    utils::HashMap<pair<int, int>, int> unranked_cache_value;
+
     // Dijkstra loop
     while (!pq.empty()) {
         pair<int, int> node = pq.pop();
@@ -360,12 +364,14 @@ void PatternDatabaseFactory::compute_distances(
             }
     
             bool mutex_violation_found = false;
+
             for(const auto &pair_of_mutex_facts: mutex_map){
 
                 const FactPair &fact = pair_of_mutex_facts.first;//check if in precond
                 const vector<FactPair> &mutex_facts = pair_of_mutex_facts.second;
  
                 int fact_pattern_id = global_variable_to_pattern_id[fact.var];
+
 
                 bool is_fact_in_precondition = false;
                 for(const FactPair precondition : preconditions){
@@ -375,7 +381,19 @@ void PatternDatabaseFactory::compute_distances(
                     }  
                 }
                
-                bool is_fact_in_pattern = (fact_pattern_id != -1 && projection.unrank(predecessor, fact_pattern_id) == fact.value);
+                //bool is_fact_in_pattern = (fact_pattern_id != -1 && projection.unrank(predecessor, fact_pattern_id) == fact.value);
+                bool is_fact_in_pattern = false;
+                if(fact_pattern_id != -1){
+                    auto iter = unranked_cache_value.find(std::make_pair(fact_pattern_id,predecessor));
+                    if(iter != unranked_cache_value.end()){
+                        is_fact_in_pattern = (iter->second == fact.value);
+                    } 
+                    else{
+                        int unranked_val = projection.unrank(predecessor,fact_pattern_id);
+                        unranked_cache_value.emplace(std::make_pair(fact_pattern_id, predecessor), unranked_val);
+                        is_fact_in_pattern = (unranked_val == fact.value);
+                    }
+                }
 
                 if(!is_fact_in_pattern && !is_fact_in_precondition){
                     continue;
@@ -397,8 +415,20 @@ void PatternDatabaseFactory::compute_distances(
 
                     }
                     
-                    bool is_mutex_fact_in_state = (pattern_id != -1 && projection.unrank(predecessor, pattern_id) == mutex_fact.value);
+                    //bool is_mutex_fact_in_state = (pattern_id != -1 && projection.unrank(predecessor, pattern_id) == mutex_fact.value);
+                    bool is_mutex_fact_in_state = false;
 
+                    if(pattern_id != -1){
+                        auto iter = unranked_cache_value.find(std::make_pair(pattern_id,predecessor));
+                        if(iter != unranked_cache_value.end()){
+                            is_mutex_fact_in_state = (iter->second == mutex_fact.value);
+                        } 
+                        else{
+                            int state_unranked_val = projection.unrank(predecessor,pattern_id);
+                            unranked_cache_value.emplace(std::make_pair(pattern_id, predecessor), state_unranked_val);
+                            is_mutex_fact_in_state = (state_unranked_val == mutex_fact.value);
+                        }
+                    }
                     if(is_mutex_fact_in_state || is_mutex_fact_in_precondition ){
                         mutex_violation_found = true;
                         break;

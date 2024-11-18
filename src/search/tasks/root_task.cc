@@ -82,7 +82,7 @@ public:
 
     // To add get_mutex_facts it should contain a map which helps us with mutex information unlike the are_facts_mutex above.
     //virtual std::map<FactPair, std::vector<FactPair>> get_mutex_facts() const override;
-    virtual std::unordered_map<FactPair, std::vector<FactPair>, FactPairHash> get_mutex_facts() const override;
+    virtual std::unordered_map<FactPair, std::vector<FactPair>, utils::FactPairHash> get_mutex_facts() const override;
 
     virtual int get_operator_cost(int index, bool is_axiom) const override;
     virtual string get_operator_name(
@@ -424,33 +424,8 @@ bool RootTask::are_facts_mutex(const FactPair &fact1, const FactPair &fact2) con
 }
 
 //Implementation of get_mutex_facts
-/*
-std::map<FactPair, std::vector<FactPair>> RootTask::get_mutex_facts() const {
-    std::map<FactPair, std::vector<FactPair>> map_of_mutex_facts;
-
-    for (size_t var = 0 ; var < mutexes.size(); var++){
-        for (size_t value = 0; value < mutexes[var].size(); value++){
-
-            FactPair fact(var,value); // we create a FactPair object with the corresponding var,value.
-
-            const auto &mutex_set = mutexes[var][value];
-            if(mutex_set.empty()){
-                continue;
-            }
-
-            std::vector<FactPair> mutex_facts(mutex_set.begin(), mutex_set.end());
-
-            map_of_mutex_facts[fact] = mutex_facts;
-            
-            
-        }
-    }
-    return map_of_mutex_facts;
-}
-*/
-
-std::unordered_map<FactPair, std::vector<FactPair>, FactPairHash> RootTask::get_mutex_facts() const {
-    std::unordered_map<FactPair, std::vector<FactPair>, FactPairHash> map_of_mutex_facts;
+std::unordered_map<FactPair, std::vector<FactPair>, utils::FactPairHash> RootTask::get_mutex_facts() const {
+    std::unordered_map<FactPair, std::vector<FactPair>, utils::FactPairHash> map_of_mutex_facts;
 
     for (size_t var = 0; var < mutexes.size(); var++) {
         for (size_t value = 0; value < mutexes[var].size(); value++) {

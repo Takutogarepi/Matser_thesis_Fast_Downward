@@ -44,13 +44,24 @@ struct FactPair {
 std::ostream &operator<<(std::ostream &os, const FactPair &fact_pair);
 
 //define a hash for our get_mutex_facts unordered map.
-struct FactPairHash {
+/*struct FactPairHash {
     std::size_t operator()(const FactPair &factpair) const {
         std::size_t h1 = std::hash<int>()(factpair.var);
         std::size_t h2 = std::hash<int>()(factpair.value);
         return h1 ^ (h2 << 1);
     }
+};*/
+namespace utils{
+    struct FactPairHash {
+    std::size_t operator()(const FactPair &factpair) const {
+        HashState hash_state;
+        feed(hash_state, factpair.var);
+        feed(hash_state, factpair.value);
+        return hash_state.get_hash32(); 
+    }
 };
+}
+
 
 namespace utils {
 inline void feed(HashState &hash_state, const FactPair &fact) {
@@ -71,13 +82,8 @@ public:
     virtual std::string get_fact_name(const FactPair &fact) const = 0;
     virtual bool are_facts_mutex(const FactPair &fact1, const FactPair &fact2) const = 0;
 
-    /*
-    virtual std::map<FactPair, std::vector<FactPair>> get_mutex_facts() const{
-        return std::map<FactPair, std::vector<FactPair>>();
-    };*/
-
-    virtual std::unordered_map<FactPair, std::vector<FactPair> , FactPairHash> get_mutex_facts() const{
-        return std::unordered_map<FactPair, std::vector<FactPair> , FactPairHash> ();
+    virtual std::unordered_map<FactPair, std::vector<FactPair> , utils::FactPairHash> get_mutex_facts() const{
+        return std::unordered_map<FactPair, std::vector<FactPair> , utils::FactPairHash> ();
     };
  
 
