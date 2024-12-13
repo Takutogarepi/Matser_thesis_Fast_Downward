@@ -23,7 +23,51 @@ PDBHeuristic::PDBHeuristic(
     const shared_ptr<AbstractTask> &transform, bool cache_estimates,
     const string &description, utils::Verbosity verbosity)
     : Heuristic(transform, cache_estimates, description, verbosity),
-      pdb(get_pdb_from_generator(task, pattern)) {
+      pdb(get_pdb_from_generator(task, pattern)),
+      lp_solver(lp::LPSolverType::CPLEX) {
+        lp_solver.set_mip_gap(0);
+        named_vector::NamedVector<lp::LPVariable> variables;
+        named_vector::NamedVector<lp::LPConstraint> constraints;
+
+        std::unordered_map<int, int> map_fact_id_to_variable;
+        
+
+        double infinity = lp_solver.get_infinity();
+        for(size_t variable_index = 0; variable_index < task_proxy.get_variables().size(); variable_index++){
+            VariableProxy vars = task_proxy.get_variables()[variable_index];
+            for(int val = 0; val < vars.get_domain_size(); val++){
+                int fact_id = variable_index * vars.get_domain_size() + val;
+                map_fact_id_to_variable[fact_id] = variables.size();
+                variables.push_back(lp::LPVariable(0, 1,  1, true));
+
+            }
+  
+            
+        }
+
+        lp::LPConstraint init_state_constraint(0.0,1.0);
+        for(size_t variable_index = 0; variable_index < task_proxy.get_variables().size(); variable_index++){
+            int init_val = task_proxy.get_initial_state()[variable_index].get_value();
+            int fact_id = variable_index * task_proxy.get_variables()[variable_index].get_domain_size() + init_val;
+            auto it = map_fact_id_to_variable.find(fact_id);
+            if(it != map_fact_id_to_variable.end()){
+                init_state_constraint.insert(it->second,1.0);    
+            }
+            
+        }
+
+        constraints.push_back(init_state_constraint);
+
+        for(OperatorProxy op : task_proxy.get_operators()){
+            lp::LPConstraint action_constraint(-infinity, 0.0);
+        }
+
+
+
+
+        lp::LinearProgram lp (lp::LPObjectiveSense::MAXIMIZE, move(variables), move(constraints), infinity);
+        lp_solver.load_problem(lp);
+
 }
 
 int PDBHeuristic::compute_heuristic(const State &ancestor_state) {
