@@ -30,28 +30,38 @@ PDBHeuristic::PDBHeuristic(
         named_vector::NamedVector<lp::LPConstraint> constraints;
 
         std::unordered_map<int, int> map_fact_id_to_variable;
+
+        std::vector<int> compute_fact_id(task_proxy.get_variables().size(), 0);
+        int total_index = 0;
+        for(size_t variable_index = 0 ; variable_index < task_proxy.get_variables().size(); variable_index++){
+            compute_fact_id[variable_index] = total_index;
+            total_index += task_proxy.get_variables()[variable_index].get_domain_size();
+        }
         
 
         double infinity = lp_solver.get_infinity();
         for(size_t variable_index = 0; variable_index < task_proxy.get_variables().size(); variable_index++){
             VariableProxy vars = task_proxy.get_variables()[variable_index];
             for(int val = 0; val < vars.get_domain_size(); val++){
-                int fact_id = variable_index * vars.get_domain_size() + val;
+                int fact_id = compute_fact_id[variable_index] + val;
                 map_fact_id_to_variable[fact_id] = variables.size();
                 variables.push_back(lp::LPVariable(0, 1,  1, true));
 
+                std::cout << "Fact ID: " << fact_id << ", Variable ID: " << map_fact_id_to_variable[fact_id] << std::endl;
+
             }
-  
-            
+     
         }
 
         lp::LPConstraint init_state_constraint(0.0,1.0);
         for(size_t variable_index = 0; variable_index < task_proxy.get_variables().size(); variable_index++){
             int init_val = task_proxy.get_initial_state()[variable_index].get_value();
-            int fact_id = variable_index * task_proxy.get_variables()[variable_index].get_domain_size() + init_val;
+            int fact_id = compute_fact_id[variable_index] + init_val;
             auto it = map_fact_id_to_variable.find(fact_id);
             if(it != map_fact_id_to_variable.end()){
                 init_state_constraint.insert(it->second,1.0);    
+
+                std::cout << "Initial State - Fact ID: " << fact_id << ", Variable ID: " << it->second << std::endl;
             }
             
         }
@@ -60,6 +70,19 @@ PDBHeuristic::PDBHeuristic(
 
         for(OperatorProxy op : task_proxy.get_operators()){
             lp::LPConstraint action_constraint(-infinity, 0.0);
+
+            for(EffectProxy effect : op.get_effects()){
+                FactProxy affected_fact = effect.get_fact();
+                int variable_index = affected_fact.get_variable().get_id();
+                int value = affected_fact.get_value();
+                int fact_id = compute_fact_id[variable_index] + value;
+                auto it = map_fact_id_to_variable.find(fact_id);
+                if(it != map_fact_id_to_variable.end()){
+                    action_constraint.insert(it->second,1.0);
+                    std::cout << "Operator Effect - Fact ID: " << fact_id << ", Variable ID: " << it->second << std::endl;
+                }
+
+            }
         }
 
 
