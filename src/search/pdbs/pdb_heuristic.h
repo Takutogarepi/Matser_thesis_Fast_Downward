@@ -5,7 +5,6 @@
 
 #include "../heuristic.h"
 
-#include "../lp/lp_solver.h"
 
 namespace pdbs {
 class PatternDatabase;
@@ -13,10 +12,12 @@ class PatternDatabase;
 // Implements a heuristic for a single PDB.
 class PDBHeuristic : public Heuristic {
     std::shared_ptr<PatternDatabase> pdb;
-    lp::LPSolver lp_solver;
+
 protected:
     virtual int compute_heuristic(const State &ancestor_state) override;
 public:
+
+
     /*
       Important: It is assumed that the pattern (passed via
       pattern_generator) is sorted, contains no duplicates and is small
@@ -29,7 +30,7 @@ public:
     */
     PDBHeuristic(
         const std::shared_ptr<PatternGenerator> &pattern_generator,
-        //lp::LPSolverType lpsolver,
+        
         const std::shared_ptr<AbstractTask> &transform,
         bool cache_estimates, const std::string &description,
         utils::Verbosity verbosity);
