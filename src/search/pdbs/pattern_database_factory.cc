@@ -508,15 +508,15 @@ void PatternDatabaseFactory::compute_distances(
         }
         return map_of_mutex_facts;
     }();
-   
     vector<int> global_variable_to_pattern_id(task_proxy.get_variables().size(),-1);
             for(size_t i = 0; i < projection.get_pattern().size(); i++){
                 global_variable_to_pattern_id[projection.get_pattern()[i]]=i;
             }
-
-    
+            
     vector<FactPair> preconditions; 
     preconditions.reserve(task_proxy.get_variables().size());
+
+    utils::HashMap<pair<int, int>, int> unranked_cache_value;
 
     // Dijkstra loop
     while (!pq.empty()) {
@@ -534,11 +534,6 @@ void PatternDatabaseFactory::compute_distances(
             const AbstractOperator &op = abstract_ops[op_id];
             int predecessor = state_index + op.get_hash_effect();
 
-            vector<int> unranked_values(projection.get_pattern().size());
-            for(size_t i = 0; i < projection.get_pattern().size(); ++i){
-                unranked_values[i] = projection.unrank(predecessor,i);
-            }
-
             int concrete_operator_id = op.get_concrete_op_id();
             const OperatorProxy &concrete_operator = task_proxy.get_operators()[concrete_operator_id];
 
@@ -553,10 +548,9 @@ void PatternDatabaseFactory::compute_distances(
 
                 const FactPair &fact = pair_of_mutex_facts.first;//check if in precond
                 const vector<FactPair> &mutex_facts = pair_of_mutex_facts.second;
-                
-                
  
                 int fact_pattern_id = global_variable_to_pattern_id[fact.var];
+
 
                 bool is_fact_in_precondition = false;
                 for(const FactPair precondition : preconditions){
@@ -566,7 +560,19 @@ void PatternDatabaseFactory::compute_distances(
                     }  
                 }
                
-                bool is_fact_in_pattern = (fact_pattern_id != -1 && unranked_values[fact_pattern_id] == fact.value);
+
+                bool is_fact_in_pattern = false;
+                if(fact_pattern_id != -1){
+                    auto iter = unranked_cache_value.find(std::make_pair(fact_pattern_id,predecessor));
+                    if(iter != unranked_cache_value.end()){
+                        is_fact_in_pattern = (iter->second == fact.value);
+                    } 
+                    else{
+                        int unranked_val = projection.unrank(predecessor,fact_pattern_id);
+                        unranked_cache_value.emplace(std::make_pair(fact_pattern_id, predecessor), unranked_val);
+                        is_fact_in_pattern = (unranked_val == fact.value);
+                    }
+                }
 
                 if(!is_fact_in_pattern && !is_fact_in_precondition){
                     continue;
@@ -588,8 +594,20 @@ void PatternDatabaseFactory::compute_distances(
 
                     }
                     
-                    bool is_mutex_fact_in_state = (pattern_id != -1 && unranked_values[pattern_id] == mutex_fact.value);
                     
+                    bool is_mutex_fact_in_state = false;
+
+                    if(pattern_id != -1){
+                        auto iter = unranked_cache_value.find(std::make_pair(pattern_id,predecessor));
+                        if(iter != unranked_cache_value.end()){
+                            is_mutex_fact_in_state = (iter->second == mutex_fact.value);
+                        } 
+                        else{
+                            int state_unranked_val = projection.unrank(predecessor,pattern_id);
+                            unranked_cache_value.emplace(std::make_pair(pattern_id, predecessor), state_unranked_val);
+                            is_mutex_fact_in_state = (state_unranked_val == mutex_fact.value);
+                        }
+                    }
                     if(is_mutex_fact_in_state || is_mutex_fact_in_precondition ){
                         mutex_violation_found = true;
                         break;
@@ -602,6 +620,7 @@ void PatternDatabaseFactory::compute_distances(
 
                 }
                 
+
             }
             if(!mutex_violation_found){
                         int alternative_cost = distances[state_index] + op.get_cost();
