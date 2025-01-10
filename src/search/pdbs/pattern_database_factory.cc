@@ -434,6 +434,7 @@ void PatternDatabaseFactory::compute_distances(
                     current_solution.push_back(i);
                     }
                 }
+            all_solutions.push_back(current_solution);
     
             lp::LPConstraint exclusion_constraint(1.0, infinity);
             for(size_t i = 0; i < solution_set.size(); i++){
@@ -503,7 +504,9 @@ void PatternDatabaseFactory::compute_distances(
                 }
             }
             
-            map_of_mutex_facts[fact] = std::move(mutex_facts);
+            if(!mutex_facts.empty()){
+                map_of_mutex_facts[fact] = std::move(mutex_facts);
+            }
             
         }
         return map_of_mutex_facts;
@@ -519,6 +522,7 @@ void PatternDatabaseFactory::compute_distances(
     utils::HashMap<pair<int, int>, int> unranked_cache_value;
 
     // Dijkstra loop
+    std::cout << mutexes.size() << endl;
     while (!pq.empty()) {
         pair<int, int> node = pq.pop();
         int distance = node.first;
