@@ -522,7 +522,6 @@ void PatternDatabaseFactory::compute_distances(
     utils::HashMap<pair<int, int>, int> unranked_cache_value;
 
     // Dijkstra loop
-    std::cout << mutexes.size() << endl;
     while (!pq.empty()) {
         pair<int, int> node = pq.pop();
         int distance = node.first;
