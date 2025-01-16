@@ -21,6 +21,7 @@ using namespace std;
 using utils::ExitCode;
 
 namespace tasks {
+std::vector<std::vector<FactPair>> invariant_groups_global;//stores invariant_groups from read_mutexes
 static const int PRE_FILE_VERSION = 3;
 shared_ptr<AbstractTask> g_root_task = nullptr;
 
@@ -83,6 +84,8 @@ public:
     // To add get_mutex_facts it should contain a map which helps us with mutex information unlike the are_facts_mutex above.
     //virtual std::map<FactPair, std::vector<FactPair>> get_mutex_facts() const override;
     virtual std::unordered_map<FactPair, std::vector<FactPair>, utils::FactPairHash> get_mutex_facts() const override;
+
+    virtual std::vector<std::vector<FactPair>> get_invariant_groups() const override;
 
     virtual int get_operator_cost(int index, bool is_axiom) const override;
     virtual string get_operator_name(
@@ -285,6 +288,8 @@ static vector<vector<set<FactPair>>> read_mutexes(istream &in, const vector<Expl
             invariant_group.emplace_back(var, value);
         }
         check_magic(in, "end_mutex_group");
+        invariant_groups_global.push_back(invariant_group);
+
         for (const FactPair &fact1 : invariant_group) {
             for (const FactPair &fact2 : invariant_group) {
                 if (fact1.var != fact2.var) {
@@ -302,7 +307,7 @@ static vector<vector<set<FactPair>>> read_mutexes(istream &in, const vector<Expl
                 }
             }
         }
-    }
+    } 
     return inconsistent_facts;
 }
 
@@ -441,6 +446,11 @@ std::unordered_map<FactPair, std::vector<FactPair>, utils::FactPairHash> RootTas
         }
     }
     return map_of_mutex_facts;
+}
+
+//define get_invariant_groups
+std::vector<std::vector<FactPair>> RootTask::get_invariant_groups() const{
+    return invariant_groups_global;
 }
 
 int RootTask::get_operator_cost(int index, bool is_axiom) const {

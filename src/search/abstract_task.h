@@ -85,6 +85,10 @@ public:
     virtual std::unordered_map<FactPair, std::vector<FactPair> , utils::FactPairHash> get_mutex_facts() const{
         return std::unordered_map<FactPair, std::vector<FactPair> , utils::FactPairHash> ();
     };
+
+    virtual std::vector<std::vector<FactPair>> get_invariant_groups() const {
+        return std::vector<std::vector<FactPair>> (); 
+}//added this
  
 
 

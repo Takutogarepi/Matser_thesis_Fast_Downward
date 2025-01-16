@@ -332,6 +332,7 @@ void PatternDatabaseFactory::compute_distances(
 
     
     //const auto &mutex_map = task_proxy.get_mutex_facts();
+    const auto &invariant_groups = task_proxy.get_invariant_groups();
     const auto &mutexes = [&]()->std::unordered_map<FactPair, std::vector<FactPair>, utils::FactPairHash>{
         std::unordered_map<FactPair, vector<FactPair>, utils::FactPairHash> map_of_mutex_facts;
        
@@ -351,7 +352,7 @@ void PatternDatabaseFactory::compute_distances(
             total_index += task_proxy.get_variables()[variable_index].get_domain_size();
         }
 
-        std::vector<std::vector<int>> all_solutions;
+        
 
         const double infinity = lp_solver.get_infinity();
         for(size_t variable_index = 0; variable_index < number_of_variables; variable_index++){
@@ -418,6 +419,23 @@ void PatternDatabaseFactory::compute_distances(
             constraints.push_back(std::move(action_constraint));
 
         }
+
+        //std::vector<std::vector<int>> all_solutions;
+        utils::HashSet<std::vector<int>> all_solutions;
+        for(const auto &invariant_group_element : invariant_groups){
+            std::vector<int> solution;
+            for(const FactPair &fact : invariant_group_element){
+                int fact_id = compute_fact_id[fact.var] + fact.value;
+                auto it = map_fact_id_to_variable_id.find(fact_id);
+                if(it != map_fact_id_to_variable_id.end()){
+                    solution.push_back(it->second);
+                }
+            }
+            if(!solution.empty()){
+                all_solutions.insert(solution);
+            }
+        }
+
         lp::LinearProgram lp (lp::LPObjectiveSense::MAXIMIZE, std::move(variables), std::move(constraints), infinity);
         lp_solver.load_problem(lp);
         lp_solver.solve();
@@ -434,7 +452,7 @@ void PatternDatabaseFactory::compute_distances(
                     current_solution.push_back(i);
                     }
                 }
-            all_solutions.push_back(current_solution);
+            all_solutions.insert(current_solution);
     
             lp::LPConstraint exclusion_constraint(1.0, infinity);
             for(size_t i = 0; i < solution_set.size(); i++){
@@ -505,7 +523,7 @@ void PatternDatabaseFactory::compute_distances(
             }
             
             if(!mutex_facts.empty()){
-                map_of_mutex_facts[fact] = std::move(mutex_facts);
+                map_of_mutex_facts[fact] = std::move(mutex_facts);                            
             }
             
         }

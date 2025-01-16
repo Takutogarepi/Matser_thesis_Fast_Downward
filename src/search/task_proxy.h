@@ -728,6 +728,10 @@ public:
         return task->get_mutex_facts();
     }
 
+    std::vector<std::vector<FactPair>> get_invariant_groups() const{
+    return task->get_invariant_groups();
+}//added this
+
     const causal_graph::CausalGraph &get_causal_graph() const;
 };
 
