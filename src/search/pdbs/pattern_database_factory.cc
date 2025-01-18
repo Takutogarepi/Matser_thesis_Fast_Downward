@@ -433,22 +433,24 @@ void PatternDatabaseFactory::compute_distances(
             }
             if(!solution.empty()){
                 all_solutions.insert(solution);
+                lp::LPConstraint strict_exclusion(1.0, infinity);
+                for(int variable_id : solution){
+                    strict_exclusion.insert(variable_id, 1.0);
+                    }
+                constraints.push_back(std::move(strict_exclusion));
             }
         }
 
-        for(const auto &found_solution : all_solutions){
+        /*for(const auto &solution : all_solutions){
             lp::LPConstraint fd_group_constraint(1.0, infinity);
-            for(size_t i = 0; i < variables.size(); i++){
-                if(std::find(found_solution.begin(), found_solution.end(), i) == found_solution.end()){
-                    fd_group_constraint.insert(i, 1.0);
-                }
+            for(int variable_id : solution){
+                fd_group_constraint.insert(variable_id, 1.0);
             }
-            exclusion_constraints.push_back(std::move(fd_group_constraint));
-        }
+            constraints.push_back(std::move(fd_group_constraint));
+        }*/
 
         lp::LinearProgram lp (lp::LPObjectiveSense::MAXIMIZE, std::move(variables), std::move(constraints), infinity);
         lp_solver.load_problem(lp);
-        lp_solver.add_temporary_constraints(exclusion_constraints);
         lp_solver.solve();
         
         while(lp_solver.has_optimal_solution() && lp_solver.get_objective_value() > 1.5){
