@@ -82,8 +82,7 @@ public:
         const FactPair &fact1, const FactPair &fact2) const override;
 
     // To add get_mutex_facts it should contain a map which helps us with mutex information unlike the are_facts_mutex above.
-    //virtual std::map<FactPair, std::vector<FactPair>> get_mutex_facts() const override;
-    virtual std::unordered_map<FactPair, std::vector<FactPair>, utils::FactPairHash> get_mutex_facts() const override;
+    //virtual std::unordered_map<FactPair, std::vector<FactPair>, utils::FactPairHash> get_mutex_facts() const override;
 
     virtual std::vector<std::vector<FactPair>> get_invariant_groups() const override;
 
@@ -429,7 +428,7 @@ bool RootTask::are_facts_mutex(const FactPair &fact1, const FactPair &fact2) con
 }
 
 //Implementation of get_mutex_facts
-std::unordered_map<FactPair, std::vector<FactPair>, utils::FactPairHash> RootTask::get_mutex_facts() const {
+/*std::unordered_map<FactPair, std::vector<FactPair>, utils::FactPairHash> RootTask::get_mutex_facts() const {
     std::unordered_map<FactPair, std::vector<FactPair>, utils::FactPairHash> map_of_mutex_facts;
 
     for (size_t var = 0; var < mutexes.size(); var++) {
@@ -446,7 +445,7 @@ std::unordered_map<FactPair, std::vector<FactPair>, utils::FactPairHash> RootTas
         }
     }
     return map_of_mutex_facts;
-}
+}*/
 
 //define get_invariant_groups
 std::vector<std::vector<FactPair>> RootTask::get_invariant_groups() const{
