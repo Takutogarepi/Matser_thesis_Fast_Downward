@@ -337,6 +337,184 @@ void PatternDatabaseFactory::compute_distances(
             sorted_fd_invariants.push_back(i);
     }
 
+    const auto &fam_group_mutexes = [&]()->std::vector<std::vector<FactPair>>{
+        auto fd_groups = sorted_fd_invariants;
+        lp::LPSolver lp_solver(lp::LPSolverType::CPLEX);
+        lp_solver.set_mip_gap(0);
+        
+        named_vector::NamedVector<lp::LPVariable> variables;
+        named_vector::NamedVector<lp::LPConstraint> constraints;
+        named_vector::NamedVector<lp::LPConstraint> exclusion_constraints;
+        const double infinity = lp_solver.get_infinity();
+
+        std::unordered_map<int, int> map_fact_id_to_var_id;
+        const size_t number_of_variables = task_proxy.get_variables().size();
+        std::vector<int> compute_fact_id(number_of_variables, 0);
+        int total_index = 0;
+
+        for(size_t variable_index = 0; variable_index < number_of_variables; variable_index++){
+            compute_fact_id[variable_index] = total_index;
+            total_index += task_proxy.get_variables()[variable_index].get_domain_size();
+        }
+
+        //LP variables
+        for(size_t variable_index = 0; variable_index < number_of_variables; variable_index++){
+            const VariableProxy &vars = task_proxy.get_variables()[variable_index];
+            for(int val = 0; val < vars.get_domain_size(); val++){
+                const int fact_id = compute_fact_id[variable_index] + val;
+                map_fact_id_to_var_id.emplace(fact_id, variables.size());
+                variables.push_back(lp::LPVariable(0, 1, 1, true));
+            }
+        }
+
+        //LP initial constraints
+        lp::LPConstraint initial_state_constraint(0.0, 1.0);
+        for(size_t variable_index = 0; variable_index < number_of_variables; variable_index++){
+            int initial_val = task_proxy.get_initial_state()[variable_index].get_value();
+            int fact_id = compute_fact_id[variable_index] + initial_val;
+            
+            auto it = map_fact_id_to_var_id.find(fact_id);
+            if(it != map_fact_id_to_var_id.end()){
+                initial_state_constraint.insert(it->second, 1.0);
+            }
+
+        }
+        constraints.push_back(move(initial_state_constraint));
+
+        //LP action constraints
+        for(const OperatorProxy &op : task_proxy.get_operators()){
+            lp::LPConstraint action_constraint(-infinity, 0.0);
+            for(const EffectProxy &effect : op.get_effects()){
+                const FactProxy affected_fact = effect.get_fact();
+                const int variable_index = affected_fact.get_variable().get_id();
+                const int val = affected_fact.get_value();
+                const int fact_id = compute_fact_id[variable_index] + val;
+
+                auto it = map_fact_id_to_var_id.find(fact_id);
+                if(it != map_fact_id_to_var_id.end()){
+                    action_constraint.insert(it->second, 1.0);
+                }
+
+            }
+
+            for(const FactProxy &precond : op.get_preconditions()){
+                int variable_index = precond.get_variable().get_id();
+                int val = precond.get_value();
+                int fact_id = compute_fact_id[variable_index] + val;
+
+                auto precond_iter = map_fact_id_to_var_id.find(fact_id);
+                if(precond_iter != map_fact_id_to_var_id.end()){
+                    for(const EffectProxy &effect : op.get_effects()){
+                        const FactProxy deleted_fact = effect.get_fact();
+
+                        if(deleted_fact.get_variable().get_id() == precond.get_variable().get_id()
+                            && deleted_fact.get_value() != precond.get_value()){
+                                const int delete_fact_id = compute_fact_id[variable_index] + deleted_fact.get_value();
+                                auto delete_iter = map_fact_id_to_var_id.find(delete_fact_id);
+                                if(delete_iter != map_fact_id_to_var_id.end()){
+                                    action_constraint.insert(precond_iter->second, -1.0);
+                                }
+                            }
+                    }
+                }
+            }
+            constraints.push_back(move(action_constraint));
+        }
+
+        utils::HashSet<vector<int>> all_solutions;
+
+        for(const auto fd_members : fd_groups){
+            std::vector<int> solution;
+            for(const FactPair &fact : fd_members){
+                int fact_id = compute_fact_id[fact.var] + fact.value;
+                auto it = map_fact_id_to_var_id.find(fact_id);
+                if(it != map_fact_id_to_var_id.end()){
+                    solution.push_back(it->second);
+                }
+            }
+
+            if(!solution.empty()){
+                all_solutions.insert(solution);
+                lp::LPConstraint strict_exclusion(1.0, infinity);
+                for(int variable_id : solution){
+                    strict_exclusion.insert(variable_id, 1.0);
+                }
+                constraints.push_back(move(strict_exclusion));
+            }
+        }
+
+        
+        lp::LinearProgram lp(lp::LPObjectiveSense::MAXIMIZE, move(variables), move(constraints), infinity);
+        lp_solver.load_problem(lp);
+        lp_solver.solve();
+
+        while(lp_solver.has_optimal_solution() && lp_solver.get_objective_value() > 1.5){
+            auto solution_set = lp_solver.extract_solution();
+
+            if (solution_set.empty()) break;
+            
+            std::vector<int> current_solution;
+            current_solution.reserve(solution_set.size());
+            for(size_t i = 0; i < solution_set.size(); i++ ){
+                if(solution_set[i] > 0.5){
+                    current_solution.push_back(i);
+                    }
+                }
+            all_solutions.insert(current_solution);
+    
+            lp::LPConstraint exclusion_constraint(1.0, infinity);
+            for(size_t i = 0; i < solution_set.size(); i++){
+                if(solution_set[i] <= 0.5){
+                    exclusion_constraint.insert(i, 1.0);
+                }
+            }
+            
+            exclusion_constraints.push_back(std::move(exclusion_constraint));
+            lp_solver.clear_temporary_constraints();
+            lp_solver.add_temporary_constraints(exclusion_constraints);
+            
+            lp_solver.solve();
+
+        }
+
+        vector<vector<FactPair>> mutex_groups;
+        unordered_map<int, FactPair> reverse_map_LP_variable_id_to_FactPair;
+
+        for(const auto &i : map_fact_id_to_var_id){
+            int fact_id = i.first;
+            int lp_variable_id = i.second;
+            int var   = -1;
+            int value = -1;
+            for(size_t variable_id = 0; variable_id < compute_fact_id.size(); variable_id++){
+                int init_fact_id = compute_fact_id[variable_id];
+                if(fact_id >= init_fact_id && fact_id < init_fact_id + task_proxy.get_variables()[variable_id].get_domain_size()){
+                    var = variable_id;
+                    value = fact_id - init_fact_id;
+                    break;
+                }
+            }
+            if(var != -1 && value != -1){
+                reverse_map_LP_variable_id_to_FactPair.emplace(lp_variable_id , FactPair(var,value));
+            }
+        }
+
+        for(const auto &solution : all_solutions){
+            vector<FactPair> mutex_group;
+            for(int var : solution){
+                auto it = reverse_map_LP_variable_id_to_FactPair.find(var);
+                if(it != reverse_map_LP_variable_id_to_FactPair.end()){
+                    mutex_group.push_back(it->second);
+                }
+            }
+
+            if(!mutex_group.empty()){
+                sort(mutex_group.begin(), mutex_group.end());
+                mutex_groups.push_back(mutex_group);
+            }
+        }
+        return mutex_groups;
+    }();
+
     vector<FactPair> preconditions_vector; 
     preconditions_vector.reserve(task_proxy.get_variables().size());
 
@@ -345,10 +523,6 @@ void PatternDatabaseFactory::compute_distances(
     vector<FactPair> intersection;
 
 
-    /*vector<int> global_variable_to_pattern_id(task_proxy.get_variables().size(),-1);
-    for(size_t i = 0; i < projection.get_pattern().size(); i++){
-        global_variable_to_pattern_id[projection.get_pattern()[i]]=i;
-        }*/
 
     // Dijkstra loop
     while (!pq.empty()) {
@@ -363,7 +537,6 @@ void PatternDatabaseFactory::compute_distances(
         vector<int> applicable_operator_ids;
         match_tree.get_applicable_operator_ids(state_index, applicable_operator_ids);
         for (int op_id : applicable_operator_ids) {
-            //cout  << "New operator " << op_id << endl; //to delete
             const AbstractOperator &op = abstract_ops[op_id];
             int predecessor = state_index + op.get_hash_effect();
 
@@ -391,13 +564,13 @@ void PatternDatabaseFactory::compute_distances(
 
             bool mutex_violation = false;
 
-            std::set_union(preconditions_vector.cbegin(), preconditions_vector.cend(), predecssor_vector.cbegin(), predecssor_vector.cend(), std::back_inserter(preconditions_predecessor));
+            std::set_union(preconditions_vector.begin(), preconditions_vector.end(), predecssor_vector.begin(), predecssor_vector.end(),
+                std::back_inserter(preconditions_predecessor));
 
-            for(auto &i : sorted_fd_invariants){
+            for(auto &i : fam_group_mutexes){
                 intersection.clear();
-                std::set_intersection(i.begin(), i.end(), preconditions_predecessor.begin(), preconditions_predecessor.end(),
-                          std::back_inserter(intersection));
-                //cout << "Intersection size: " << intersection.size() << endl; // to delete
+                std::set_intersection(i.begin(), i.end(), preconditions_predecessor.begin(), preconditions_predecessor.end(), 
+                    std::back_inserter(intersection));
                 if(intersection.size() > 1){
                     mutex_violation = true;
                     break;
@@ -420,7 +593,6 @@ void PatternDatabaseFactory::compute_distances(
 
             }
             
-            //cout << "End operator \n" << endl; // to delete
         }
     }
 }
