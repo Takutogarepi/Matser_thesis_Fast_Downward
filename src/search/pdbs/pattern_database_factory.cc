@@ -423,7 +423,7 @@ void PatternDatabaseFactory::compute_distances(
 
         utils::HashSet<vector<int>> all_solutions;
 
-        for(const auto fd_members : fd_groups){
+        for(const auto &fd_members : fd_groups){
             std::vector<int> solution;
             for(const FactPair &fact : fd_members){
                 int fact_id = compute_fact_id[fact.var] + fact.value;
@@ -522,6 +522,8 @@ void PatternDatabaseFactory::compute_distances(
     vector<FactPair> preconditions_predecessor;
     vector<FactPair> intersection;
 
+    utils::HashMap<pair<int, int>, int> unranked_cache_value;
+
 
 
     // Dijkstra loop
@@ -547,8 +549,16 @@ void PatternDatabaseFactory::compute_distances(
             predecssor_vector.clear();
             preconditions_predecessor.clear();
             for (size_t pattern_var_id = 0; pattern_var_id < projection.get_pattern().size(); ++pattern_var_id){
-            int val = projection.unrank(predecessor, pattern_var_id);
-            predecssor_vector.emplace_back(projection.get_pattern()[pattern_var_id], val);
+                auto key = make_pair(predecessor, pattern_var_id);
+                auto iter = unranked_cache_value.find(key);
+                if(iter != unranked_cache_value.end()){
+                    predecssor_vector.emplace_back(projection.get_pattern()[pattern_var_id], iter->second);
+                }
+                else{
+                    int unranked_value = projection.unrank(predecessor, pattern_var_id);
+                    unranked_cache_value.emplace(key, unranked_value);
+                    predecssor_vector.emplace_back(projection.get_pattern()[pattern_var_id], unranked_value);
+                }
             }
             sort(predecssor_vector.begin(), predecssor_vector.end());
             predecssor_vector.erase(unique(predecssor_vector.begin(), predecssor_vector.end()), predecssor_vector.end());
