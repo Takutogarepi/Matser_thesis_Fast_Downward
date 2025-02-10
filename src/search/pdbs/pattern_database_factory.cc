@@ -10,6 +10,7 @@
 #include "../utils/math.h"
 #include "../utils/rng.h"
 #include "../utils/hash.h"
+#include "../utils/timer.h"
 #include "../lp/lp_solver.h"
 
 #include <algorithm>
@@ -337,7 +338,10 @@ void PatternDatabaseFactory::compute_distances(
             sorted_fd_invariants.push_back(i);
     }
 
+
     const auto &fam_group_mutexes = [&]()->std::vector<std::vector<FactPair>>{
+        cout << "starting LP-preprocessing " << endl;
+        utils::Timer lp_solving_timer;
         auto fd_groups = sorted_fd_invariants;
         lp::LPSolver lp_solver(lp::LPSolverType::CPLEX);
         lp_solver.set_mip_gap(0);
@@ -446,6 +450,7 @@ void PatternDatabaseFactory::compute_distances(
         
         lp::LinearProgram lp(lp::LPObjectiveSense::MAXIMIZE, move(variables), move(constraints), infinity);
         lp_solver.load_problem(lp);
+        //cout << "starting LP-solving " << endl;
         lp_solver.solve();
 
         while(lp_solver.has_optimal_solution() && lp_solver.get_objective_value() > 1.5){
@@ -472,7 +477,7 @@ void PatternDatabaseFactory::compute_distances(
             exclusion_constraints.push_back(std::move(exclusion_constraint));
             lp_solver.clear_temporary_constraints();
             lp_solver.add_temporary_constraints(exclusion_constraints);
-            
+            //cout << "Iteratively LP-solving " << endl;
             lp_solver.solve();
 
         }
@@ -512,9 +517,12 @@ void PatternDatabaseFactory::compute_distances(
                 mutex_groups.push_back(mutex_group);
             }
         }
+        cout << "LP solving total time: " << lp_solving_timer << endl;
         return mutex_groups;
+        
     }();
-
+    
+    //cout << "done LP-solving!!! " << endl;
     vector<FactPair> preconditions_vector; 
     preconditions_vector.reserve(task_proxy.get_variables().size());
 
