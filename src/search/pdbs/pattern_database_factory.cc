@@ -338,7 +338,7 @@ void PatternDatabaseFactory::compute_distances(
             sorted_fd_invariants.push_back(i);
     }
 
-
+/* fam-group mutex computation. This is commented out so we ignore it when dealing with h2.
     const auto &fam_group_mutexes = [&]()->std::vector<std::vector<FactPair>>{
         cout << "starting LP-preprocessing " << endl;
         utils::Timer lp_solving_timer;
@@ -520,7 +520,7 @@ void PatternDatabaseFactory::compute_distances(
         cout << "LP solving total time: " << lp_solving_timer << endl;
         return mutex_groups;
         
-    }();
+    }();*/
     
     //cout << "done LP-solving!!! " << endl;
     vector<FactPair> preconditions_vector; 
@@ -585,7 +585,7 @@ void PatternDatabaseFactory::compute_distances(
             std::set_union(preconditions_vector.begin(), preconditions_vector.end(), predecssor_vector.begin(), predecssor_vector.end(),
                 std::back_inserter(preconditions_predecessor));
 
-            for(auto &i : fam_group_mutexes){
+            for(auto &i : sorted_fd_invariants){
                 intersection.clear();
                 std::set_intersection(i.begin(), i.end(), preconditions_predecessor.begin(), preconditions_predecessor.end(), 
                     std::back_inserter(intersection));
