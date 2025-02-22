@@ -36,6 +36,8 @@ def main():
     for component in args.components:
         if component == "translate":
             (exitcode, continue_execution) = run_components.run_translate(args)
+        elif component == "h2_preprocessor":
+            (exitcode, continue_execution) = run_components.run_h2_preprocessor(args)#added this part
         elif component == "search":
             (exitcode, continue_execution) = run_components.run_search(args)
             if not args.keep_sas_file:

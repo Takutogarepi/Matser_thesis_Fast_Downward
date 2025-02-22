@@ -21,6 +21,7 @@ else:
 
 # TODO: We might want to turn translate into a module and call it with "python3 -m translate".
 REL_TRANSLATE_PATH = Path("translate") / "translate.py"
+REL_H2_PREPROCESSOR_PATH = Path(f"preprocess{BINARY_EXT}")
 REL_SEARCH_PATH = Path(f"downward{BINARY_EXT}")
 # Older versions of VAL use lower case, newer versions upper case. We prefer the
 # older version because this is what our build instructions recommend.
@@ -98,6 +99,50 @@ def run_translate(args):
         # Pass on any other exit code, including in particular signals or
         # exit codes such as running out of memory or time.
         return (returncode, False)
+        
+def run_h2_preprocessor(args):
+    logging.info("Running h2_preprocessor (%s)." % args.build)
+    time_limit = limits.get_time_limit(
+        args.h2_preprocessor_time_limit, args.overall_time_limit)
+    memory_limit = limits.get_memory_limit(
+        args.h2_preprocessor_memory_limit, args.overall_memory_limit)
+    executable = get_executable(args.build, REL_H2_PREPROCESSOR_PATH)
+
+    plan_manager = PlanManager(
+        args.plan_file,
+        portfolio_bound=args.portfolio_bound,
+        single_plan=args.portfolio_single_plan)
+    plan_manager.delete_existing_plans()
+
+    if args.portfolio:
+        assert not args.search_options
+        logging.info(f"h2_preprocessor portfolio: {args.portfolio}")
+        return portfolio_runner.run(
+            args.portfolio, executable, args.search_options, plan_manager,
+            time_limit, memory_limit)
+    else:
+        if not args.search_options:
+            returncodes.exit_with_driver_input_error(
+                "search needs --alias, --portfolio, or search options")
+        if "--help" not in args.search_options:
+            args.search_options.extend(["--internal-plan-file", args.plan_file])
+        try:
+            call.check_call(
+                "h2_preprocessor",
+                [executable], #removed this + args.search_options,
+                stdin="output.sas",
+                time_limit=time_limit,
+                memory_limit=memory_limit)
+        except subprocess.CalledProcessError as err:
+            # TODO: if we ever add support for SEARCH_PLAN_FOUND_AND_* directly
+            # in the planner, this assertion no longer holds. Furthermore, we
+            # would need to return (err.returncode, True) if the returncode is
+            # in [0..10].
+            # Negative exit codes are allowed for passing out signals.
+            assert err.returncode >= 10 or err.returncode < 0, "got returncode < 10: {}".format(err.returncode)
+            return (err.returncode, False)
+        else:
+            return (0, True)
 
 
 def run_search(args):
