@@ -41,5 +41,13 @@ add_custom_command(TARGET translate POST_BUILD
         ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_CFG_INTDIR}/translate
     COMMENT "Copying translator module into output directory")
 
+# Copy the preprocess binaries to output directory. I added this part
+add_custom_target(copy_preprocess ALL)
+add_custom_command(TARGET copy_preprocess POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+        /infai/togare0000/downward-projects/Matser_thesis_Fast_Downward/h2-preprocessor/builds/release32/bin/preprocess
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_CFG_INTDIR}/
+    COMMENT "Copying h2-preprocess binaries into output directory")
+
 # Add search component as a subproject.
 add_subdirectory(search)
