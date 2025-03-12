@@ -2,9 +2,12 @@
 
 #include "pattern_database.h"
 
-
+#include "utils.h"
 #include "../plugins/plugin.h"
 #include "../utils/markup.h"
+
+#include "../utils/logging.h"
+#include "../utils/timer.h"
 
 #include <limits>
 #include <memory>
@@ -12,10 +15,30 @@
 using namespace std;
 
 namespace pdbs {
+//Added this for logging
+void dump_pattern_generation_statistics(
+    const string &identifier,
+    utils::Duration runtime,    
+    utils::LogProxy &log) {
+    if (log.is_at_least_normal()) {
+        log << identifier << " computation time: " << runtime << endl;
+    }
+}
+
 static shared_ptr<PatternDatabase> get_pdb_from_generator(
     const shared_ptr<AbstractTask> &task,
-    const shared_ptr<PatternGenerator> &pattern_generator) {
+    const shared_ptr<PatternGenerator> &pattern_generator,
+    utils::LogProxy &log) {
+    utils::Timer timer;
+    if (log.is_at_least_normal()){
+        log << "Initializing PDB heuristic..." << endl;
+    }
     PatternInformation pattern_info = pattern_generator->generate(task);
+    
+    //Dumping the timing statisics
+    dump_pattern_generation_statistics(
+        "PDB heuristic", timer(), pattern_info, log);
+    
     return pattern_info.get_pdb();
 }
 
@@ -24,7 +47,7 @@ PDBHeuristic::PDBHeuristic(
     const shared_ptr<AbstractTask> &transform, bool cache_estimates,
     const string &description, utils::Verbosity verbosity)
     : Heuristic(transform, cache_estimates, description, verbosity),
-      pdb(get_pdb_from_generator(task, pattern)){}
+      pdb(get_pdb_from_generator(task, pattern, log)){}
 
 int PDBHeuristic::compute_heuristic(const State &ancestor_state) {
     State state = convert_ancestor_state(ancestor_state);
@@ -54,6 +77,7 @@ static basic_string<char> paper_references() {
         "AAAI Press",
         "2012");
 }
+
 class PDBHeuristicFeature
     : public plugins::TypedFeature<Evaluator, PDBHeuristic> {
 public:

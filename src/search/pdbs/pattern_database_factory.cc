@@ -302,8 +302,7 @@ bool PatternDatabaseFactory::is_goal_state(int state_index) const {
 
 
 void PatternDatabaseFactory::compute_distances(
-    const MatchTree &match_tree, bool compute_plan) {
-    utils::Timer pdb_generation_timer;
+    const MatchTree &match_tree, bool compute_plan) {    
     distances.reserve(projection.get_num_abstract_states());
     // first implicit entry: priority, second entry: index for an abstract state
     priority_queues::AdaptiveQueue<int> pq;
@@ -339,16 +338,16 @@ void PatternDatabaseFactory::compute_distances(
             sorted_fd_invariants.push_back(i);
     }
     //cout << "sorted_fd_invariants size: " << sorted_fd_invariants.size() << endl;
-    int max_mutex_pairs = 0;
-    for(auto &group : sorted_fd_invariants) {
-        int n = group.size();
+    //int max_mutex_pairs = 0;
+    //for(auto &group : sorted_fd_invariants) {
+      //  int n = group.size();
         //cout << "group size: " << n << endl;
-        int mutex_pairs = (n * (n - 1)) / 2;
-        if(mutex_pairs > max_mutex_pairs){
-            max_mutex_pairs = mutex_pairs;
-        }
+        //int mutex_pairs = (n * (n - 1)) / 2;
+        //if(mutex_pairs > max_mutex_pairs){
+         //   max_mutex_pairs = mutex_pairs;
+        //}
         
-}
+//}
 
 /* fam-group mutex computation. This is commented out so we ignore it when dealing with h2.
     const auto &fam_group_mutexes = [&]()->std::vector<std::vector<FactPair>>{
@@ -625,10 +624,6 @@ void PatternDatabaseFactory::compute_distances(
             
         }
     }
-    utils::g_log << "Our PDB generation time is: " << pdb_generation_timer << endl;
-    utils::g_log << "maximum number mutex pairs for task: " << max_mutex_pairs << endl;
-//now I need to log the pattern size
-//utils::g_log << "pattern size:" <<  projection.get_pattern().size() << endl; 
 }
 
 void PatternDatabaseFactory::compute_plan(
