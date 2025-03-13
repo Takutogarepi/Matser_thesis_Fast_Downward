@@ -126,6 +126,21 @@ void dump_pattern_generation_statistics(
     }
 }
 
+void dump_pdb_statistics(
+    const string &identifier,
+    utils::Duration runtime,
+    const PatternInformation &pattern_info,
+    utils::LogProxy &log) {
+    const Pattern &pattern = pattern_info.get_pattern();
+    if (log.is_at_least_normal()) {
+        log << identifier << " pattern: " << pattern << endl;
+        log << identifier << " number of variables: " << pattern.size() << endl;
+        log << identifier << " PDB size: "
+            << compute_pdb_size(pattern_info.get_task_proxy(), pattern) << endl;
+        log << identifier << " computation time: " << runtime << endl;
+    }
+}
+
 void dump_pattern_collection_generation_statistics(
     const string &identifier,
     utils::Duration runtime,

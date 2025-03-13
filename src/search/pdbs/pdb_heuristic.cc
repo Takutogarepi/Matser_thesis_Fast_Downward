@@ -9,21 +9,13 @@
 #include "../utils/logging.h"
 #include "../utils/timer.h"
 
+#include <iostream>
 #include <limits>
 #include <memory>
 
 using namespace std;
 
 namespace pdbs {
-//Added this for logging
-void dump_pattern_generation_statistics(
-    const string &identifier,
-    utils::Duration runtime,    
-    utils::LogProxy &log) {
-    if (log.is_at_least_normal()) {
-        log << identifier << " computation time: " << runtime << endl;
-    }
-}
 
 static shared_ptr<PatternDatabase> get_pdb_from_generator(
     const shared_ptr<AbstractTask> &task,
@@ -36,7 +28,7 @@ static shared_ptr<PatternDatabase> get_pdb_from_generator(
     PatternInformation pattern_info = pattern_generator->generate(task);
     
     //Dumping the timing statisics
-    dump_pattern_generation_statistics(
+    dump_pdb_statistics(
         "PDB heuristic", timer(), pattern_info, log);
     
     return pattern_info.get_pdb();
